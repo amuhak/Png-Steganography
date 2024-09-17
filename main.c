@@ -7,19 +7,18 @@
 #include "stb_image_write.h"
 #include "stb_image.h"
 
-int main(void) {
+void encode(const char *image_path, const char *str) {
     // x, y, and no of channels in the image
     int x, y, n;
 
     // Load the image into an 8-bit array so its easy to manipulate
-    uint8_t *data = stbi_load("./image.png", &x, &y, &n, 0);
+    uint8_t *data = stbi_load(image_path, &x, &y, &n, 0);
 
     int data_size = x * y * n;
 
-    printf("x: %d y: %d n: %d \n", x, y, n);
+    // printf("x: %d y: %d n: %d \n", x, y, n);
 
 
-    const char *str = "Data to encode";
     int len = strlen(str);
     int no_of_bits = 8 * len;
 
@@ -33,7 +32,7 @@ int main(void) {
         }
     }
 
-    printf("len: %d\n", len);
+    // printf("len: %d\n", len);
 
     // Encoding the data into the image (LSB)
     // first 32 bits are the length of the data
@@ -43,7 +42,7 @@ int main(void) {
         len_bits[31 - i] = (no_of_bits >> i) & 1;
     }
 
-    printf("no_of_bits: %d \n", no_of_bits);
+    // printf("no_of_bits: %d \n", no_of_bits);
 
     // Encoding the length of the data
     uint8_t *head = data;
@@ -74,11 +73,16 @@ int main(void) {
 
     // Freeing the data
     stbi_image_free(data);
+}
+
+char *decode(const char *image_path) {
 
     // reading the data from the image
-    data = stbi_load("./out.png", &x, &y, &n, 0);
-    data_size = x * y * n;
-    head = data;
+    int x, y, n;
+
+    uint8_t *data = stbi_load("./out.png", &x, &y, &n, 0);
+    int data_size = x * y * n;
+    uint8_t *head = data;
 
     // Find the length of the data (first 32 bits)
     int len_data = 0;
@@ -87,7 +91,7 @@ int main(void) {
         len_data |= *head & 1;
         head++;
     }
-    printf("len_data: %d\n", len_data);
+    // printf("len_data: %d\n", len_data);
 
     // Reading the data
     bool *data_bits = malloc(len_data * sizeof(bool));
@@ -106,10 +110,16 @@ int main(void) {
     }
 
     decoded_data[len_data / 8] = '\0';
-    printf("Decoded data: %s\n", decoded_data);
 
     free(data_bits);
-    free(decoded_data);
     stbi_image_free(data);
+    return decoded_data;
+}
+
+int main(void) {
+    encode("./image.png", "Hello World");
+    char *ans = decode("./out.png");
+    printf("Decoded data: %s\n", ans);
+    free(ans);
     return 0;
 }
