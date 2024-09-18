@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -7,7 +9,7 @@
 #include "stb_image_write.h"
 #include "stb_image.h"
 
-void encode(const char *image_path, const char *str) {
+void print(const char *image_path, const char *str, const char *out_path) {
     // x, y, and no of channels in the image
     int x, y, n;
 
@@ -18,9 +20,13 @@ void encode(const char *image_path, const char *str) {
 
     // printf("x: %d y: %d n: %d \n", x, y, n);
 
-
-    int len = strlen(str);
+    int len = (int) strlen(str);
     int no_of_bits = 8 * len;
+
+    if (no_of_bits + 32 > data_size) {
+        printf("Data is too large for the image\n could print only %d bytes\n", (data_size - 32) / 8);
+        return;
+    }
 
     // Converting the data into binary for easy reading
     bool *bits = malloc(no_of_bits * sizeof(bool));
@@ -59,39 +65,36 @@ void encode(const char *image_path, const char *str) {
     // Encoding the data
     for (int i = 0; i < no_of_bits; i++) {
         if (bits[i]) {
-            *head |= 1;
+            head[i] |= 1;
         } else {
-            *head &= 0b11111110;
+            head[i] &= 0b11111110;
         }
-        head++;
     }
 
     free(bits);
 
     // Writing the data to the image
-    stbi_write_png("./out.png", x, y, n, data, x * n);
+    stbi_write_png(out_path, x, y, n, data, x * n);
 
     // Freeing the data
     stbi_image_free(data);
 }
 
-char *decode(const char *image_path) {
+char *read(const char *image_path) {
 
     // reading the data from the image
     int x, y, n;
 
-    uint8_t *data = stbi_load("./out.png", &x, &y, &n, 0);
-    int data_size = x * y * n;
+    uint8_t *data = stbi_load(image_path, &x, &y, &n, 0);
     uint8_t *head = data;
 
     // Find the length of the data (first 32 bits)
     int len_data = 0;
     for (int i = 0; i < 32; i++) {
-        len_data = len_data << 1;
+        len_data <<= 1;
         len_data |= *head & 1;
         head++;
     }
-    // printf("len_data: %d\n", len_data);
 
     // Reading the data
     bool *data_bits = malloc(len_data * sizeof(bool));
@@ -104,7 +107,7 @@ char *decode(const char *image_path) {
     char *decoded_data = calloc(len_data / 8 + 1, sizeof(char));
     for (int i = 0; i < len_data / 8; i++) {
         for (int j = 0; j < 8; j++) {
-            decoded_data[i] = decoded_data[i] << 1;
+            decoded_data[i] <<= 1;
             decoded_data[i] |= data_bits[i * 8 + j];
         }
     }
@@ -116,10 +119,30 @@ char *decode(const char *image_path) {
     return decoded_data;
 }
 
-int main(void) {
-    encode("./image.png", "Hello World");
-    char *ans = decode("./out.png");
+void print_help() {
+    printf("Usage:\n");
+#ifdef ENCODE
+    printf("  Encode: ./encode <input_image> <message> <output_image>\n");
+#else
+    printf("  Decode: ./read <input_image>\n");
+#endif
+}
+
+int main(int argc, char *argv[]) {
+#ifdef ENCODE
+    if (argc != 4) {
+        print_help();
+        return 1;
+    }
+    print(argv[1], argv[2], argv[3]);
+#else
+    if (argc != 2) {
+        print_help();
+        return 1;
+    }
+    char *ans = read(argv[1]);
     printf("Decoded data: %s\n", ans);
     free(ans);
+#endif
     return 0;
 }
