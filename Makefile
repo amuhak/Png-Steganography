@@ -3,7 +3,7 @@ CFLAGS = -lm -Wall -Wextra -g -O0 -g3 -fsanitize=address,undefined,leak
 BIN_DIR = bin
 
 # Source and header files
-SRC = main.c stb_image.h stb_image_write.h
+SRC = main.c stb_image.h stb_image_write.h sha256.h sha256.c
 
 # Output binaries
 ENCODE_BIN = $(BIN_DIR)/encode

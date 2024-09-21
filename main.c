@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include "sha256.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -48,8 +49,6 @@ void print(const char *image_path, const char *str, const char *out_path) {
         len_bits[31 - i] = (no_of_bits >> i) & 1;
     }
 
-    // printf("no_of_bits: %d \n", no_of_bits);
-
     // Encoding the length of the data
     uint8_t *head = data;
 
@@ -65,10 +64,17 @@ void print(const char *image_path, const char *str, const char *out_path) {
     // Encoding the data
     for (int i = 0; i < no_of_bits; i++) {
         if (bits[i]) {
-            head[i] |= 1;
+            *head |= 1;
         } else {
-            head[i] &= 0b11111110;
+            *head &= 0b11111110;
         }
+        ++head;
+    }
+
+    // Padding the rest of the image with 0
+    while (head - data < data_size) {
+        *head &= 0b11111110;
+        ++head;
     }
 
     free(bits);
@@ -134,13 +140,32 @@ int main(int argc, char *argv[]) {
         print_help();
         return 1;
     }
-    print(argv[1], argv[2], argv[3]);
+    char *text = argv[2];
+    char hex[SHA256_HEX_SIZE];
+    sha256_hex(text, strlen(text), hex);
+    // Add the hash to the text
+    char *new_text = malloc(strlen(text) + SHA256_HEX_SIZE + 1);
+    strcpy(new_text, text);
+    strcat(new_text, hex);
+    print(argv[1], new_text, argv[3]);
+    free(new_text);
 #else
     if (argc != 2) {
         print_help();
         return 1;
     }
     char *ans = read(argv[1]);
+    int len = strlen(ans);
+    char hash[SHA256_HEX_SIZE + 1];
+    strcpy(hash, ans + len + 1 - SHA256_HEX_SIZE);
+    ans[len + 1 - SHA256_HEX_SIZE] = 0;
+    char real_hash[SHA256_HEX_SIZE];
+    sha256_hex(ans, len + 1 - SHA256_HEX_SIZE, real_hash);
+    if (strcmp(real_hash, hash) != 0) {
+        printf("Hash mismatch\n");
+        free(ans);
+        return 1;
+    }
     printf("Decoded data: %s\n", ans);
     free(ans);
 #endif
