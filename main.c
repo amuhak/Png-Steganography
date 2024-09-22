@@ -10,15 +10,11 @@
 #include "stb_image_write.h"
 #include "stb_image.h"
 
-#include <stdbool.h>
-#include <stdlib.h>
-
 bool *encode(bool *in, int *in_len) {
     // 7,4 Hamming code
     int blocks = (*in_len + 3) / 4;
-    bool *out = (bool *) malloc(blocks * 7 * sizeof(bool));
-    *in_len = (*in_len + 3) / 4;
-    *in_len *= 7;
+    *in_len = ((*in_len + 3) / 4) * 7;
+    bool *out = (bool *) malloc((*in_len) * sizeof(bool));
 
     for (int i = 0; i < blocks; i++) {
         bool *data = out + i * 7;  // 7 bits for each block
@@ -36,7 +32,7 @@ bool *encode(bool *in, int *in_len) {
 
 char *decode(bool *in, int in_len) {
     int out_len = in_len / 7 * 4;
-    bool *out = malloc(out_len * sizeof(bool));
+    bool *out = calloc(out_len, sizeof(bool));
 
     for (int i = 0; i < in_len / 7; i++) {
         bool *data = in + i * 7;
@@ -59,8 +55,7 @@ char *decode(bool *in, int in_len) {
         decoded[2] = data[6 - 1];
         decoded[3] = data[7 - 1];
     }
-    int result_len = out_len / 8 + 1;
-    char *result = malloc(out_len * sizeof(char));
+    char *result = calloc(out_len + 10, sizeof(char));
     for (int i = 0; i < out_len / 8; i++) {
         int c = 0;
         for (int j = 0; j < 8; j++) {
@@ -68,7 +63,6 @@ char *decode(bool *in, int in_len) {
         }
         result[i] = (char) c;
     }
-    result[result_len] = 0;  // Null-terminate the string
 
     free(out);
     return result;
@@ -168,18 +162,6 @@ bool *read(const char *image_path, int *len) {
 
     stbi_image_free(data);
     return data_bits;
-/*
-    // Decoding the data 1 char = 1 byte
-    char *decoded_data = calloc(len_data / 8 + 1, sizeof(char));
-    for (int i = 0; i < len_data / 8; i++) {
-        for (int j = 0; j < 8; j++) {
-            decoded_data[i] <<= 1;
-            decoded_data[i] |= data_bits[i * 8 + j];
-        }
-    }
-
-    decoded_data[len_data / 8] = '\0';
-    */
 }
 
 void print_help() {
@@ -225,7 +207,6 @@ int main(int argc, char *argv[]) {
     bool *encoded_data = read(argv[1], &len);
     encoded_data[0] = !encoded_data[0];
     char *decoded_data = decode(encoded_data, len);
-
     len = strlen(decoded_data);
     decoded_data[len] = '\0';
 
