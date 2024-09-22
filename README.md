@@ -1,11 +1,12 @@
 # Png Steganography
 
 ## Features
-``
+
 - Encode ASCII messages into PNG images
 - Decode messages from encoded PNG images
 - Error detection and correction using Hamming(7,4) code
 - SHA256 hash for message integrity verification
+- Multithreaded makefile for faster compilation (use `make -j4`)
 
 ## Requirements
 
@@ -112,3 +113,5 @@ compatibility is not guaranteed.
 
 GCC 14.1.0 was used for development, and was built from
 source [using this script](https://github.com/amuhak/make-gcc/blob/main/build.sh).
+
+`test.sh` is an included script that can be used to build and test the project.
