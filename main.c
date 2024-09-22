@@ -10,7 +10,81 @@
 #include "stb_image_write.h"
 #include "stb_image.h"
 
-void print(const char *image_path, const char *str, const char *out_path) {
+#include <stdbool.h>
+#include <stdlib.h>
+
+bool *encode(bool *in, int *in_len) {
+    // 7,4 Hamming code
+    int blocks = (*in_len + 3) / 4;
+    bool *out = (bool *) malloc(blocks * 7 * sizeof(bool));
+    *in_len = (*in_len + 3) / 4;
+    *in_len *= 7;
+
+    for (int i = 0; i < blocks; i++) {
+        bool *data = out + i * 7;  // 7 bits for each block
+
+        data[3 - 1] = in[i * 4];
+        data[5 - 1] = in[i * 4 + 1];
+        data[6 - 1] = in[i * 4 + 2];
+        data[7 - 1] = in[i * 4 + 3];
+        data[1 - 1] = data[3 - 1] ^ data[5 - 1] ^ data[7 - 1];
+        data[2 - 1] = data[3 - 1] ^ data[6 - 1] ^ data[7 - 1];
+        data[4 - 1] = data[5 - 1] ^ data[6 - 1] ^ data[7 - 1];
+    }
+    return out;
+}
+
+char *decode(bool *in, int in_len) {
+    int out_len = in_len / 7 * 4;
+    bool *out = malloc(out_len * sizeof(bool));
+
+    for (int i = 0; i < in_len / 7; i++) {
+        bool *data = in + i * 7;
+        bool *decoded = out + i * 4;
+
+        int problem = 0;
+        for (int j = 0; j < 7; j++) {
+            if (data[j]) {
+                problem ^= (j + 1);
+            }
+        }
+
+        // If there is a problem, correct it
+        if (problem != 0) {
+            data[problem - 1] = !data[problem - 1];
+        }
+
+        decoded[0] = data[3 - 1];
+        decoded[1] = data[5 - 1];
+        decoded[2] = data[6 - 1];
+        decoded[3] = data[7 - 1];
+    }
+    int result_len = out_len / 8 + 1;
+    char *result = malloc(out_len * sizeof(char));
+    for (int i = 0; i < out_len / 8; i++) {
+        int c = 0;
+        for (int j = 0; j < 8; j++) {
+            c = (c << 1) | (out[i * 8 + j] ? 1 : 0);
+        }
+        result[i] = (char) c;
+    }
+    result[result_len] = 0;  // Null-terminate the string
+
+    free(out);
+    return result;
+}
+
+bool *char_to_bits(const char *str, int len) {
+    bool *bits = malloc(len * 8 * sizeof(bool));
+    for (int i = 0; i < len; i++) {
+        for (int j = 7; j >= 0; j--) {
+            bits[i * 8 + 7 - j] = (str[i] >> j) & 1;
+        }
+    }
+    return bits;
+}
+
+void print(const char *image_path, bool *input, int no_of_bits, char *out_path) {
     // x, y, and no of channels in the image
     int x, y, n;
 
@@ -19,27 +93,10 @@ void print(const char *image_path, const char *str, const char *out_path) {
 
     int data_size = x * y * n;
 
-    // printf("x: %d y: %d n: %d \n", x, y, n);
-
-    int len = (int) strlen(str);
-    int no_of_bits = 8 * len;
-
     if (no_of_bits + 32 > data_size) {
         printf("Data is too large for the image\n could print only %d bytes\n", (data_size - 32) / 8);
         return;
     }
-
-    // Converting the data into binary for easy reading
-    bool *bits = malloc(no_of_bits * sizeof(bool));
-
-    // Converting the data into binary
-    for (int i = 0; i < len; i++) {
-        for (int j = 7; j >= 0; j--) {
-            bits[i * 8 + 7 - j] = (str[i] >> j) & 1;
-        }
-    }
-
-    // printf("len: %d\n", len);
 
     // Encoding the data into the image (LSB)
     // first 32 bits are the length of the data
@@ -63,7 +120,7 @@ void print(const char *image_path, const char *str, const char *out_path) {
 
     // Encoding the data
     for (int i = 0; i < no_of_bits; i++) {
-        if (bits[i]) {
+        if (input[i]) {
             *head |= 1;
         } else {
             *head &= 0b11111110;
@@ -77,8 +134,6 @@ void print(const char *image_path, const char *str, const char *out_path) {
         ++head;
     }
 
-    free(bits);
-
     // Writing the data to the image
     stbi_write_png(out_path, x, y, n, data, x * n);
 
@@ -86,7 +141,7 @@ void print(const char *image_path, const char *str, const char *out_path) {
     stbi_image_free(data);
 }
 
-char *read(const char *image_path) {
+bool *read(const char *image_path, int *len) {
 
     // reading the data from the image
     int x, y, n;
@@ -102,6 +157,8 @@ char *read(const char *image_path) {
         head++;
     }
 
+    *len = len_data;
+
     // Reading the data
     bool *data_bits = malloc(len_data * sizeof(bool));
     for (int i = 0; i < len_data; i++) {
@@ -109,6 +166,9 @@ char *read(const char *image_path) {
         head++;
     }
 
+    stbi_image_free(data);
+    return data_bits;
+/*
     // Decoding the data 1 char = 1 byte
     char *decoded_data = calloc(len_data / 8 + 1, sizeof(char));
     for (int i = 0; i < len_data / 8; i++) {
@@ -119,10 +179,7 @@ char *read(const char *image_path) {
     }
 
     decoded_data[len_data / 8] = '\0';
-
-    free(data_bits);
-    stbi_image_free(data);
-    return decoded_data;
+    */
 }
 
 void print_help() {
@@ -140,34 +197,73 @@ int main(int argc, char *argv[]) {
         print_help();
         return 1;
     }
+
     char *text = argv[2];
-    char hex[SHA256_HEX_SIZE];
-    sha256_hex(text, strlen(text), hex);
-    // Add the hash to the text
+    char text_hash[SHA256_HEX_SIZE];
+    sha256_hex(text, strlen(text), text_hash);
+
+    // Add the hash to the text Hash then text
     char *new_text = malloc(strlen(text) + SHA256_HEX_SIZE + 1);
-    strcpy(new_text, text);
-    strcat(new_text, hex);
-    print(argv[1], new_text, argv[3]);
+    strcpy(new_text, text_hash);
+    strcat(new_text, text);
+    int len[1];
+    *len = strlen(new_text);
+    bool *bits = char_to_bits(new_text, *len);
+    *len *= 8;
+    bool *temp = encode(bits, len);
+    print(argv[1], temp, *len, argv[3]);
     free(new_text);
+    free(bits);
+    free(temp);
 #else
     if (argc != 2) {
         print_help();
         return 1;
     }
-    char *ans = read(argv[1]);
-    int len = strlen(ans);
-    char hash[SHA256_HEX_SIZE + 1];
-    strcpy(hash, ans + len + 1 - SHA256_HEX_SIZE);
-    ans[len + 1 - SHA256_HEX_SIZE] = 0;
-    char real_hash[SHA256_HEX_SIZE];
-    sha256_hex(ans, len + 1 - SHA256_HEX_SIZE, real_hash);
-    if (strcmp(real_hash, hash) != 0) {
-        printf("Hash mismatch\n");
-        free(ans);
+
+    int len;
+    bool *encoded_data = read(argv[1], &len);
+    encoded_data[0] = !encoded_data[0];
+    char *decoded_data = decode(encoded_data, len);
+
+    len = strlen(decoded_data);
+    decoded_data[len] = '\0';
+
+    if (len < SHA256_HEX_SIZE) {
+        fprintf(stderr, "Decoded data is too short to contain a valid hash.\n");
+        free(encoded_data);
+        free(decoded_data);
         return 1;
     }
-    printf("Decoded data: %s\n", ans);
-    free(ans);
+
+    char hash[SHA256_HEX_SIZE];
+    char real_hash[SHA256_HEX_SIZE];
+
+    // Extract the hash from the decoded data
+    strncpy(hash, decoded_data, SHA256_HEX_SIZE - 1);
+    hash[SHA256_HEX_SIZE - 1] = '\0';
+
+    // The real text starts after the hash
+    char *real_text = decoded_data + SHA256_HEX_SIZE - 1;
+
+    // Calculate the hash of the real text
+    sha256_hex(real_text, strlen(real_text), real_hash);
+
+    // Compare the hash
+    if (strcmp(real_hash, hash) != 0) {
+        printf("Hash mismatch\n");
+        printf("This means the data is corrupted\n");
+        printf("Expected hash: %s\n", hash);
+        printf("Actual hash: %s\n", real_hash);
+        printf("Decoded data: %s\n", real_text);
+    } else {
+        printf("Decoded data: %s\n", real_text);
+        printf("Hash matches\n");
+        printf("It worked \n");
+    }
+
+    free(decoded_data);
+    free(encoded_data);
 #endif
     return 0;
 }
