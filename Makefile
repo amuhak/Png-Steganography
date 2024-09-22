@@ -13,7 +13,7 @@ ENCODE_BIN = $(BIN_DIR)/encode
 DECODE_BIN = $(BIN_DIR)/decode
 
 # Default target
-all: $(ENCODE_BIN) $(DECODE_BIN) PROFILE REBUILD
+all: $(ENCODE_BIN) $(DECODE_BIN) PROFILE REBUILD_ENCODE REBUILD_DECODE REBUILD_CLEAN
 
 # Create bin directory if it doesn't exist
 $(BIN_DIR):
@@ -32,9 +32,13 @@ PROFILE: $(SRC) | $(BIN_DIR) $(ENCODE_BIN) $(DECODE_BIN)
 	$(ENCODE_BIN) ./image.png "A very very long string that I am using for profile guided optimization. This should tell the compiler what an average program run is doing, and fingers crossed, if everything goes well, the compiler will be able to make the final binary faster than it would ever be able to without all of this extra information. At worst? It should be about the same, so there is no real reason not to do this. Compile time you say. Well, that’s valid, you have to compile twice, so it takes 2x as long. I guess if you are in a hurry to compile this is a bad idea. 575 characters should do." ./out.png
 	$(DECODE_BIN) ./out.png
 
-REBUILD: $(SRC) | PROFILE
+REBUILD_ENCODE: $(SRC) | PROFILE
 	$(CC) $(SRC) -o $(ENCODE_BIN) -fprofile-use=$(DATA_DIR) $(CFLAGS) -D ENCODE
+
+REBUILD_DECODE: $(SRC) | PROFILE
 	$(CC) $(SRC) -o $(DECODE_BIN) -fprofile-use=$(DATA_DIR) $(CFLAGS)
+
+REBUILD_CLEAN:  $(SRC) | REBUILD_ENCODE REBUILD_DECODE
 	rm -rf $(DATA_DIR)
 
 # Clean up generated files
