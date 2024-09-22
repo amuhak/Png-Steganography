@@ -13,10 +13,17 @@ ENCODE_BIN = $(BIN_DIR)/encode
 DECODE_BIN = $(BIN_DIR)/decode
 
 # Default target
-all: $(ENCODE_BIN) $(DECODE_BIN) PROFILE REBUILD_ENCODE REBUILD_DECODE REBUILD_CLEAN
+all: $(ENCODE_BIN) $(DECODE_BIN) PROFILE REBUILD_ENCODE REBUILD_DECODE REBUILD_CLEAN PRE_CHECK
+
+PRE_CHECK:
+	if [ ! -f "image.png" ]; then \
+    		echo "Error: image.png does not exist! It is needed for the build processes"; \
+    		exit 1; \
+    fi
+
 
 # Create bin directory if it doesn't exist
-$(BIN_DIR):
+$(BIN_DIR): | PRE_CHECK
 	mkdir -p $(BIN_DIR)
 
 # Encode binary
